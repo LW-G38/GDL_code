@@ -24,7 +24,7 @@ def get_music_list(data_folder):
     
     return file_list, parser
 
-def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False):
+def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg=None):
     """ create the structure of the neural network """
 
     notes_in = Input(shape = (None,))
@@ -34,14 +34,17 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
     x2 = Embedding(n_durations, embed_size)(durations_in) 
 
     x = Concatenate()([x1,x2])
-
-    x = LSTM(rnn_units, return_sequences=True)(x)
-    # x = Dropout(0.2)(x)
+#first layer
+    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+    #x = Dropout(0.2)(x)
+#second layer
+#    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+#    x = Dropout(0.2)(x)
 
     if use_attention:
 
-        x = LSTM(rnn_units, return_sequences=True)(x)
-        # x = Dropout(0.2)(x)
+        x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+        #x = Dropout(0.2)(x)
 
         e = Dense(1, activation='tanh')(x)
         e = Reshape([-1])(e)
@@ -54,7 +57,7 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
     
     else:
         c = LSTM(rnn_units)(x)
-        # c = Dropout(0.2)(c)
+        #c = Dropout(0.2)(c)
                                     
     notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
     durations_out = Dense(n_durations, activation = 'softmax', name = 'duration')(c)
