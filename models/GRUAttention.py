@@ -4,7 +4,7 @@ import glob
 
 from music21 import corpus, converter
 
-from keras.layers import LSTM, Input, Dropout, Dense, Activation, Embedding, Concatenate, Reshape
+from keras.layers import LSTM, Input, Dropout, Dense, Activation, Embedding, Concatenate, Reshape, GRU
 from keras.layers import Flatten, RepeatVector, Permute, TimeDistributed
 from keras.layers import Multiply, Lambda, Softmax
 import keras.backend as K 
@@ -24,7 +24,7 @@ def get_music_list(data_folder):
     
     return file_list, parser
 
-def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None):
+def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg=None):
     """ create the structure of the neural network """
 
     notes_in = Input(shape = (None,))
@@ -35,19 +35,18 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
 
     x = Concatenate()([x1,x2])
 #first layer
-    x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg, bias_regularizer=reg, activity_regularizer=reg)(x)
-    x = Dropout(0.5)(x)
+    x = GRU(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+    #x = Dropout(0.2)(x)
 #second layer
-#    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+#    x = GRU(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
 #    x = Dropout(0.2)(x)
 
     if use_attention:
 
-        x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg, bias_regularizer=reg, activity_regularizer=reg)(x)
-        x = Dropout(0.5)(x)
+        x = GRU(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+        #x = Dropout(0.2)(x)
 
         e = Dense(1, activation='tanh')(x)
-        #e = Dense(1)(x)
         e = Reshape([-1])(e)
         alpha = Activation('softmax')(e)
 
@@ -57,7 +56,7 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
         c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
     
     else:
-        c = LSTM(rnn_units)(x)
+        c = GRU(rnn_units)(x)
         #c = Dropout(0.2)(c)
                                     
     notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
@@ -69,7 +68,7 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
     if use_attention:
         att_model = Model([notes_in, durations_in], alpha)
     else:
-        att_model = notes_network_input
+        att_model = None
 
 
     opti = RMSprop(lr = 0.001)
@@ -91,12 +90,12 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
 
     x = Concatenate()([x1,x2,x3])
 
-    x = LSTM(rnn_units, return_sequences=True)(x)
+    x = GRU(rnn_units, return_sequences=True)(x)
     # x = Dropout(0.2)(x)
 
     if use_attention:
 
-        x = LSTM(rnn_units, return_sequences=True)(x)
+        x = GRU(rnn_units, return_sequences=True)(x)
         # x = Dropout(0.2)(x)
 
         e = Dense(1, activation='tanh')(x)
@@ -109,7 +108,7 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
         c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
     
     else:
-        c = LSTM(rnn_units)(x)
+        c = GRU(rnn_units)(x)
         # c = Dropout(0.2)(c)
                                     
     notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
