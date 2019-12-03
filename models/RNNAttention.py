@@ -24,7 +24,7 @@ def get_music_list(data_folder):
     
     return file_list, parser
 
-def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None):
+def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
     """ create the structure of the neural network """
 
     notes_in = Input(shape = (None,))
@@ -35,16 +35,17 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
 
     x = Concatenate()([x1,x2])
 #first layer
-    x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg, bias_regularizer=reg, activity_regularizer=reg)(x)
-    x = Dropout(0.5)(x)
+    #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+    x = LSTM(rnn_units, return_sequences=True, kernel_regularizer=reg)(x)
+    #x = Dropout(0.5)(x)
 #second layer
 #    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
 #    x = Dropout(0.2)(x)
 
     if use_attention:
-
-        x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg, bias_regularizer=reg, activity_regularizer=reg)(x)
-        x = Dropout(0.5)(x)
+        #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+        x = LSTM(rnn_units, return_sequences=True, kernel_regularizer=reg)(x)
+        #x = Dropout(0.5)(x)
 
         e = Dense(1, activation='tanh')(x)
         #e = Dense(1)(x)
@@ -69,16 +70,16 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
     if use_attention:
         att_model = Model([notes_in, durations_in], alpha)
     else:
-        att_model = notes_network_input
+        att_model = None
 
 
-    opti = RMSprop(lr = 0.001)
+    opti = RMSprop(lr = learning_rate)
     model.compile(loss=['categorical_crossentropy', 'categorical_crossentropy'], optimizer=opti)
 
     return model, att_model
 
 
-def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size = 100, rnn_units = 256, use_attention = False):
+def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size = 100, rnn_units = 256, use_attention = False, learning_rate = 0.001):
     """ create the structure of the neural network """
 
     notes_in = Input(shape = (None,))
@@ -125,7 +126,7 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
         att_model = None
 
 
-    opti = RMSprop(lr = 0.001)
+    opti = RMSprop(lr = learning_rate)
     model.compile(loss=['categorical_crossentropy', 'categorical_crossentropy', 'categorical_crossentropy'], optimizer=opti)
 
     return model, att_model
