@@ -5,6 +5,7 @@ import glob
 from music21 import corpus, converter
 
 from keras.layers import LSTM, Input, Dropout, Dense, Activation, Embedding, Concatenate, Reshape
+from keras.layers import RNN, SimpleRNN, GRU
 from keras.layers import Flatten, RepeatVector, Permute, TimeDistributed
 from keras.layers import Multiply, Lambda, Softmax
 import keras.backend as K 
@@ -24,19 +25,12 @@ def get_music_list(data_folder):
     
     return file_list, parser
 
-def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
+def create_network_no_embed(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
     """ create the structure of the neural network """
 
-    notes_in = Input(shape = (None,))
-    durations_in = Input(shape = (None,))
-
-    x1 = Embedding(n_notes, embed_size)(notes_in)
-    x2 = Embedding(n_durations, embed_size)(durations_in) 
-
-    x = Concatenate()([x1,x2])
 #first layer
     #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
-    x = LSTM(rnn_units, return_sequences=True, kernel_regularizer=reg)(x)
+    x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg)
     #x = Dropout(0.5)(x)
 #second layer
 #    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
@@ -44,7 +38,7 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
 
     if use_attention:
         #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
-        x = LSTM(rnn_units, return_sequences=True, kernel_regularizer=reg)(x)
+        x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
         #x = Dropout(0.5)(x)
 
         e = Dense(1, activation='tanh')(x)
@@ -78,6 +72,168 @@ def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_
 
     return model, att_model
 
+def create_network(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
+    """ create the structure of the neural network """
+
+    notes_in = Input(shape = (None,))
+    durations_in = Input(shape = (None,))
+
+    x1 = Embedding(n_notes, embed_size)(notes_in)
+    x2 = Embedding(n_durations, embed_size)(durations_in)
+
+    x = Concatenate()([x1,x2])
+#first layer
+    #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+    x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+    #x = Dropout(0.5)(x)
+#second layer
+#    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+#    x = Dropout(0.2)(x)
+
+    if use_attention:
+        #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+        x = LSTM(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+        #x = Dropout(0.5)(x)
+
+        e = Dense(1, activation='tanh')(x)
+        #e = Dense(1)(x)
+        e = Reshape([-1])(e)
+        alpha = Activation('softmax')(e)
+
+        alpha_repeated = Permute([2, 1])(RepeatVector(rnn_units)(alpha))
+
+        c = Multiply()([x, alpha_repeated])
+        c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
+    
+    else:
+        c = LSTM(rnn_units)(x)
+        #c = Dropout(0.2)(c)
+                                    
+    notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
+    durations_out = Dense(n_durations, activation = 'softmax', name = 'duration')(c)
+   
+    model = Model([notes_in, durations_in], [notes_out, durations_out])
+    
+
+    if use_attention:
+        att_model = Model([notes_in, durations_in], alpha)
+    else:
+        att_model = None
+
+
+    opti = RMSprop(lr = learning_rate)
+    model.compile(loss=['categorical_crossentropy', 'categorical_crossentropy'], optimizer=opti)
+
+    return model, att_model
+
+
+def create_network_rnn(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
+    """ create the structure of the neural network """
+
+    notes_in = Input(shape = (None,))
+    durations_in = Input(shape = (None,))
+
+    x1 = Embedding(n_notes, embed_size)(notes_in)
+    x2 = Embedding(n_durations, embed_size)(durations_in)
+
+    x = Concatenate()([x1,x2])
+#first layer
+    #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+    x = SimpleRNN(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+    #x = Dropout(0.5)(x)
+#second layer
+#    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+#    x = Dropout(0.2)(x)
+
+    if use_attention:
+        #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+        x = SimpleRNN(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+        #x = Dropout(0.5)(x)
+
+        e = Dense(1, activation='tanh')(x)
+        #e = Dense(1)(x)
+        e = Reshape([-1])(e)
+        alpha = Activation('softmax')(e)
+
+        alpha_repeated = Permute([2, 1])(RepeatVector(rnn_units)(alpha))
+
+        c = Multiply()([x, alpha_repeated])
+        c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
+    
+    else:
+        c = SimpleRNN(rnn_units)(x)
+        #c = Dropout(0.2)(c)
+                                    
+    notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
+    durations_out = Dense(n_durations, activation = 'softmax', name = 'duration')(c)
+   
+    model = Model([notes_in, durations_in], [notes_out, durations_out])
+    
+
+    if use_attention:
+        att_model = Model([notes_in, durations_in], alpha)
+    else:
+        att_model = None
+
+
+    opti = RMSprop(lr = learning_rate)
+    model.compile(loss=['categorical_crossentropy', 'categorical_crossentropy'], optimizer=opti)
+
+    return model, att_model
+
+def create_network_gru(n_notes, n_durations, embed_size = 100, rnn_units = 256, use_attention = False, reg = None, learning_rate = 0.01):
+    """ create the structure of the neural network """
+
+    notes_in = Input(shape = (None,))
+    durations_in = Input(shape = (None,))
+
+    x1 = Embedding(n_notes, embed_size)(notes_in)
+    x2 = Embedding(n_durations, embed_size)(durations_in)
+
+    x = Concatenate()([x1,x2])
+#first layer
+    #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+    x = GRU(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+    #x = Dropout(0.5)(x)
+#second layer
+#    x = LSTM(rnn_units, return_sequences=True, bias_regularizer=reg)(x)
+#    x = Dropout(0.2)(x)
+
+    if use_attention:
+        #x = LSTM(rnn_units, return_sequences=True, recurrent_dropout = 0.5, kernel_regularizer=reg)(x)
+        x = GRU(rnn_units, return_sequences=True, recurrent_regularizer=reg)(x)
+        #x = Dropout(0.5)(x)
+
+        e = Dense(1, activation='tanh')(x)
+        #e = Dense(1)(x)
+        e = Reshape([-1])(e)
+        alpha = Activation('softmax')(e)
+
+        alpha_repeated = Permute([2, 1])(RepeatVector(rnn_units)(alpha))
+
+        c = Multiply()([x, alpha_repeated])
+        c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
+    
+    else:
+        c = GRU(rnn_units)(x)
+        #c = Dropout(0.2)(c)
+                                    
+    notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
+    durations_out = Dense(n_durations, activation = 'softmax', name = 'duration')(c)
+   
+    model = Model([notes_in, durations_in], [notes_out, durations_out])
+    
+
+    if use_attention:
+        att_model = Model([notes_in, durations_in], alpha)
+    else:
+        att_model = None
+
+
+    opti = RMSprop(lr = learning_rate)
+    model.compile(loss=['categorical_crossentropy', 'categorical_crossentropy'], optimizer=opti)
+
+    return model, att_model
 
 def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size = 100, rnn_units = 256, use_attention = False, learning_rate = 0.001):
     """ create the structure of the neural network """
