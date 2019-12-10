@@ -203,12 +203,12 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
     x = Concatenate()([x1,x2,x3])
 
     x = LSTM(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
-    # x = Dropout(0.2)(x)
+    #x = Dropout(0.5)(x)
 
     if use_attention:
 
         x = LSTM(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
-        # x = Dropout(0.2)(x)
+        #x = Dropout(0.5)(x)
 
         e = Dense(1, activation='tanh')(x)
         e = Reshape([-1])(e)
