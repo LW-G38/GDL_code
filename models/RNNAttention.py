@@ -202,12 +202,12 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
 
     x = Concatenate()([x1,x2,x3])
 
-    x = LSTM(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
+    x = GRU(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
     #x = Dropout(0.5)(x)
 
     if use_attention:
 
-        x = LSTM(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
+        x = GRU(rnn_units, recurrent_regularizer=reg, return_sequences=True)(x)
         #x = Dropout(0.5)(x)
 
         e = Dense(1, activation='tanh')(x)
@@ -220,7 +220,7 @@ def create_network_with_velocity(n_notes, n_durations, n_velocities, embed_size 
         c = Lambda(lambda xin: K.sum(xin, axis=1), output_shape=(rnn_units,))(c)
     
     else:
-        c = LSTM(rnn_units, recurrent_regularizer=reg)(x)
+        c = GRU(rnn_units, recurrent_regularizer=reg)(x)
         # c = Dropout(0.2)(c)
                                     
     notes_out = Dense(n_notes, activation = 'softmax', name = 'pitch')(c)
